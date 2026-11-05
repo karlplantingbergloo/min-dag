@@ -94,10 +94,10 @@
       <section class="glass card">
         <div class="head"><h2>Google-kalender och Gmail</h2><span id="g-state"></span></div>
         <div id="g-off">
-          <p class="hint">Klistra in adressen och nyckeln från ditt Min dag-skript i Google. Appen kan bara läsa – den ändrar eller skickar ingenting.</p>
+          <p class="hint">Klistra in adressen och nyckeln från ditt Min dag-skript i Google – eller klistra in hela länken från din andra enhet i det första fältet. Appen kan bara läsa – den ändrar eller skickar ingenting.</p>
           <form class="gform" id="g-form">
-            <label>Skriptets adress<input id="g-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" required></label>
-            <label>Nyckel<input id="g-key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required></label>
+            <label>Skriptets adress eller länk<input id="g-url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" required></label>
+            <label>Nyckel<input id="g-key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
             <button class="btn primary" type="submit">Anslut</button>
             <p class="hint" id="g-err" role="status"></p>
           </form>

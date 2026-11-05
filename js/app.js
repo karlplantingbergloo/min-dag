@@ -86,10 +86,16 @@
   var G = load("mindag.google", null);          // { url, key }
   var gdata = load("mindag.gdata", null);       // { at, events, mail }
   var gBusy = false;
+  // Läser en "Länk till andra enheter" (…#anslut=…). Ger { url, key } eller null.
+  function parseLink(text) {
+    var m = String(text).match(/#anslut=([^\s#]+)/);
+    if (!m) return null;
+    try { var c = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))); return c.url && c.key ? { url: c.url, key: c.key } : null; } catch (e) { return null; }
+  }
   (function connectFromLink() {
-    var m = location.hash.match(/^#anslut=(.+)$/);
-    if (!m) return;
-    try { var c = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))); if (c.url && c.key) { G = { url: c.url, key: c.key }; save("mindag.google", G); } } catch (e) { /* trasig länk */ }
+    if (!/^#anslut=/.test(location.hash)) return;
+    var c = parseLink(location.hash);
+    if (c) { G = c; save("mindag.google", G); }
     history.replaceState(null, "", location.pathname + "#mer");
   })();
   function connected() { return !!(G && gdata && gdata.events); }
@@ -121,11 +127,12 @@
   }
   $("g-form").addEventListener("submit", function (e) {
     e.preventDefault();
-    var cfg = { url: $("g-url").value.trim(), key: $("g-key").value.trim() };
+    var cfg = parseLink($("g-url").value) || { url: $("g-url").value.trim(), key: $("g-key").value.trim() };
+    if (!cfg.key) { $("g-err").textContent = "Fyll i nyckeln – eller klistra in hela länken från din andra enhet i fältet ovanför."; return; }
     if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(cfg.url)) { $("g-err").textContent = "Adressen ska börja med https://script.google.com/ och sluta med /exec."; return; }
     $("g-err").textContent = "Ansluter…";
     fetchGoogle(cfg).then(function () {
-      G = cfg; save("mindag.google", G); $("g-err").textContent = ""; $("g-key").value = ""; showGoogle(); renderData();
+      G = cfg; save("mindag.google", G); $("g-err").textContent = ""; $("g-key").value = ""; $("g-url").value = ""; showGoogle(); renderData();
     }, function (err) { $("g-err").textContent = "Det gick inte: " + err.message + "."; });
   });
   $("g-refresh").addEventListener("click", function () { gStatus("Hämtar…"); fetchGoogle().catch(function () {}); });
