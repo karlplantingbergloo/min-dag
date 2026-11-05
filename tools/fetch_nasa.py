@@ -42,10 +42,13 @@ def get(url, binary=False, tries=3, timeout=120):
 
 def exists(url):
     try:
-        req = urllib.request.Request(url, headers=UA, method="HEAD")
-        with urllib.request.urlopen(req, timeout=20) as r:
-            return r.status == 200 and int(r.headers.get("Content-Length") or "1000000") > 100000
-    except Exception:  # noqa: BLE001
+        req = urllib.request.Request(url, headers=dict(UA, Range="bytes=0-1023"))
+        with urllib.request.urlopen(req, timeout=30) as r:
+            ok = r.status in (200, 206) and "image" in (r.headers.get("Content-Type") or "image")
+            print("  ", r.status, url, flush=True)
+            return ok
+    except Exception as e:  # noqa: BLE001
+        print("  ", getattr(e, "code", e), url, flush=True)
         return False
 
 
@@ -68,19 +71,23 @@ def pick(links, name_part, prefer):
 
 def find_blue_marble():
     prefer = ["3x21600x10800", "3x5400x2700"]
-    # 1) Pröva bildarkivets nummer (flera åt gången) för novemberbilden.
-    name = "world.topo.bathy.200411.3x5400x2700.jpg"
+    # 1) Novemberbilden har nummer 73884 i NASA:s arkiv.
     for host in HOSTS:
-        recs = list(range(73500, 74800))
-        with ThreadPoolExecutor(32) as pool:
-            oks = list(pool.map(lambda r: exists(url_for(host, r, name)), recs))
-        hits = [r for r, ok in zip(recs, oks) if ok]
-        print("Hittade i arkivet", host, hits, flush=True)
-        for rec in hits:
-            for size in prefer:
-                u = url_for(host, rec, f"world.topo.bathy.200411.{size}.jpg")
-                if exists(u):
-                    return u
+        for size in prefer:
+            u = url_for(host, 73884, f"world.topo.bathy.200411.{size}.jpg")
+            if exists(u):
+                return u
+    # Läs länkarna direkt från bildens sida.
+    for page in [f"{VE}/images/73884/november-blue-marble-next-generation-w-topography-and-bathymetry",
+                 "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry"]:
+        try:
+            links = links_in(get(page, tries=2, timeout=40))
+            print("Länkar på", page, sorted(u for u in links if "200411" in u), flush=True)
+            u = pick(links, "world.topo.bathy.200411", prefer)
+            if u and "21600x21600" not in u:
+                return u
+        except Exception as e:  # noqa: BLE001
+            print("Kunde inte läsa", page, e, flush=True)
     # 2) Leta på Visible Earth efter november-sidan och läs länkarna där.
     for n in range(1, 30):
         try:
