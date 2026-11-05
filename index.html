@@ -29,7 +29,7 @@
     <!-- ============ IDAG ============ -->
     <section class="view" data-view="idag" aria-label="Idag">
       <section class="glass card hero">
-        <div class="meta"><span class="chip"><span class="dot"></span>Exempeldata</span><span class="tnum" id="updated">Uppdaterad –</span></div>
+        <div class="meta"><span class="chip" data-src="example"><span class="dot"></span>Exempeldata</span><span class="chip" data-src="google" hidden><span class="dot"></span>Från Google</span><span class="tnum" id="updated">Uppdaterad –</span></div>
         <h1 id="date">Idag</h1>
         <p class="greet" id="greet">Hej, Karl</p>
         <div class="sunline tnum">
@@ -49,14 +49,14 @@
       </section>
 
       <div class="pair">
-        <section class="glass card"><div class="eyebrow">Väder</div><div class="big tnum">6°</div><div class="sub">Mulet · Stockholm</div></section>
-        <section class="glass card"><div class="eyebrow">Jobbsök</div><div class="big tnum">5</div><div class="sub">ansökningar · 2 väntar svar</div></section>
+        <section class="glass card"><div class="eyebrow">Väder · exempel</div><div class="big tnum">6°</div><div class="sub">Mulet · Stockholm</div></section>
+        <section class="glass card"><div class="eyebrow">Jobbsök · exempel</div><div class="big tnum">5</div><div class="sub">ansökningar · 2 väntar svar</div></section>
       </div>
     </section>
 
     <!-- ============ KALENDER ============ -->
     <section class="view" data-view="kalender" aria-label="Kalender" hidden>
-      <section class="glass card page-title"><div class="meta"><span class="chip"><span class="dot"></span>Exempeldata</span></div><h1>Kalender</h1></section>
+      <section class="glass card page-title"><div class="meta"><span class="chip" data-src="example"><span class="dot"></span>Exempeldata</span><span class="chip" data-src="google" hidden><span class="dot"></span>Från Google</span></div><h1>Kalender</h1></section>
       <div id="calendar"></div>
     </section>
 
@@ -77,8 +77,8 @@
 
     <!-- ============ INKORG ============ -->
     <section class="view" data-view="inkorg" aria-label="Inkorg" hidden>
-      <section class="glass card page-title"><div class="meta"><span class="chip"><span class="dot"></span>Exempeldata</span></div><h1>Inkorg</h1></section>
-      <section class="glass card"><ul class="mail" id="mail"></ul></section>
+      <section class="glass card page-title"><div class="meta"><span class="chip" data-src="example"><span class="dot"></span>Exempeldata</span><span class="chip" data-src="google" hidden><span class="dot"></span>Från Google</span></div><h1>Inkorg</h1></section>
+      <section class="glass card"><div class="head"><h2>Gmail</h2><span id="mailcount"></span></div><ul class="mail" id="mail"></ul></section>
     </section>
 
     <!-- ============ MER ============ -->
@@ -90,6 +90,26 @@
           <button class="btn" role="radio" data-theme-opt="auto">Automatisk</button><button class="btn" role="radio" data-theme-opt="light">Alltid ljust</button><button class="btn" role="radio" data-theme-opt="dark">Alltid mörkt</button>
         </div>
         <p class="hint" id="theme-hint">Ljust när solen är uppe i Stockholm, mörkt efter skymningen.</p>
+      </section>
+      <section class="glass card">
+        <div class="head"><h2>Google-kalender och Gmail</h2><span id="g-state"></span></div>
+        <div id="g-off">
+          <p class="hint">Klistra in adressen och nyckeln från ditt Min dag-skript i Google. Appen kan bara läsa – den ändrar eller skickar ingenting.</p>
+          <form class="gform" id="g-form">
+            <label>Skriptets adress<input id="g-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" required></label>
+            <label>Nyckel<input id="g-key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required></label>
+            <button class="btn primary" type="submit">Anslut</button>
+            <p class="hint" id="g-err" role="status"></p>
+          </form>
+        </div>
+        <div id="g-on" hidden>
+          <p class="hint" id="g-status" role="status"></p>
+          <div class="row">
+            <button class="btn" id="g-refresh" type="button">Hämta nu</button>
+            <button class="btn" id="g-copy" type="button">Länk till andra enheter</button>
+            <button class="btn" id="g-disconnect" type="button">Koppla från</button>
+          </div>
+        </div>
       </section>
       <section class="glass card">
         <div class="head"><h2>Om bakgrunden</h2></div>

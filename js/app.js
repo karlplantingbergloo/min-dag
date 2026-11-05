@@ -64,20 +64,81 @@
   document.querySelectorAll("[data-go]").forEach(function (b) { b.addEventListener("click", function () { go(b.dataset.go, true); }); });
   window.addEventListener("hashchange", function () { go(location.hash.slice(1)); });
 
-  /* ---------- exempeldata ---------- */
-  var EVENTS = [
-    { day: 0, min: 600, title: "Träning", place: "Friskis & Svettis" },
-    { day: 0, min: 810, title: "Arbetsintervju", place: "Butik, Södermalm", key: true },
-    { day: 0, min: 1110, title: "Middag hemma" },
-    { day: 1, min: 540, title: "Ring Arbetsförmedlingen", key: true },
-    { day: 1, min: 900, title: "Fika med Sara", place: "Mariatorget" },
-    { day: 2, min: 660, title: "Promenad", place: "Djurgården" }
-  ];
-  var MAIL = [
-    { from: "Banken", time: "08:12", text: "Vi behöver komplettera dina uppgifter.", unread: true },
-    { from: "Butik Södermalm", time: "Igår", text: "Välkommen på intervju torsdag 13:30!", unread: true },
-    { from: "Arbetsförmedlingen", time: "Mån", text: "Påminnelse: aktivitetsrapport senast den 14:e." }
-  ];
+  /* ---------- exempeldata (visas tills Google är anslutet) ---------- */
+  function exampleEvents(t) {
+    var list = [[0, 600, 60, "Träning", "Friskis & Svettis"], [0, 810, 60, "Arbetsintervju", "Butik, Södermalm"], [0, 1110, 90, "Middag hemma"],
+      [1, 540, 30, "Ring Arbetsförmedlingen"], [1, 900, 60, "Fika med Sara", "Mariatorget"], [2, 660, 90, "Promenad", "Djurgården"]];
+    return list.map(function (e) {
+      var d = dayYmd(t, e[0]), s = Sun.stockholmDate(d.y, d.m, d.d, e[1]);
+      return { title: e[3], location: e[4] || "", allDay: false, start: s.toISOString(), end: new Date(s.getTime() + e[2] * 60000).toISOString() };
+    });
+  }
+  function exampleMail() {
+    var n = Date.now();
+    return { unread: 2, threads: [
+      { from: "Banken", subject: "Komplettering behövs", snippet: "Vi behöver komplettera dina uppgifter.", date: new Date(n - 3 * 3600000).toISOString(), unread: true },
+      { from: "Butik Södermalm", subject: "Intervju", snippet: "Välkommen på intervju torsdag 13:30!", date: new Date(n - 26 * 3600000).toISOString(), unread: true },
+      { from: "Arbetsförmedlingen", subject: "Påminnelse", snippet: "Aktivitetsrapport senast den 14:e.", date: new Date(n - 80 * 3600000).toISOString() }
+    ] };
+  }
+
+  /* ---------- Google (via ditt eget Google Apps Script) ---------- */
+  var G = load("mindag.google", null);          // { url, key }
+  var gdata = load("mindag.gdata", null);       // { at, events, mail }
+  var gBusy = false;
+  (function connectFromLink() {
+    var m = location.hash.match(/^#anslut=(.+)$/);
+    if (!m) return;
+    try { var c = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))); if (c.url && c.key) { G = { url: c.url, key: c.key }; save("mindag.google", G); } } catch (e) { /* trasig länk */ }
+    history.replaceState(null, "", location.pathname + "#mer");
+  })();
+  function connected() { return !!(G && gdata && gdata.events); }
+  function gStatus(text) { $("g-status").textContent = text; }
+  function showGoogle() {
+    $("g-off").hidden = !!G; $("g-on").hidden = !G;
+    $("g-state").textContent = G ? "Ansluten" : "Inte ansluten";
+    if (G && gdata && !gBusy) gStatus("Senast hämtat " + hm.format(new Date(gdata.at)) + ".");
+  }
+  function fetchGoogle(cfg) {
+    cfg = cfg || G;
+    if (!cfg || gBusy) return Promise.resolve(false);
+    gBusy = true;
+    return fetch(cfg.url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ key: cfg.key }) })
+      .then(function (r) { if (!r.ok) throw new Error("svar " + r.status); return r.json(); })
+      .then(function (d) {
+        if (d.error) throw new Error(d.error);
+        if (!Array.isArray(d.events) || !d.mail) throw new Error("oväntat svar från skriptet");
+        gdata = { at: Date.now(), events: d.events, mail: d.mail };
+        save("mindag.gdata", gdata); gBusy = false; renderData(); showGoogle();
+        return true;
+      })
+      .catch(function (e) {
+        gBusy = false;
+        var msg = /Failed to fetch|NetworkError|Load failed/i.test(e.message) ? "kunde inte nå skriptet (kontrollera adressen och att åtkomst är \"Alla\")" : e.message;
+        gStatus("Kunde inte hämta: " + msg + ".");
+        return Promise.reject(new Error(msg));
+      });
+  }
+  $("g-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var cfg = { url: $("g-url").value.trim(), key: $("g-key").value.trim() };
+    if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(cfg.url)) { $("g-err").textContent = "Adressen ska börja med https://script.google.com/ och sluta med /exec."; return; }
+    $("g-err").textContent = "Ansluter…";
+    fetchGoogle(cfg).then(function () {
+      G = cfg; save("mindag.google", G); $("g-err").textContent = ""; $("g-key").value = ""; showGoogle(); renderData();
+    }, function (err) { $("g-err").textContent = "Det gick inte: " + err.message + "."; });
+  });
+  $("g-refresh").addEventListener("click", function () { gStatus("Hämtar…"); fetchGoogle().catch(function () {}); });
+  $("g-disconnect").addEventListener("click", function () {
+    G = null; gdata = null; save("mindag.google", null); save("mindag.gdata", null); showGoogle(); renderData();
+  });
+  $("g-copy").addEventListener("click", function () {
+    var link = location.origin + location.pathname + "#anslut=" + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(G)))));
+    var done = function () { gStatus("Länken är kopierad. Öppna den på din andra enhet. Den innehåller din nyckel – dela den inte med någon."); };
+    if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, function () { window.prompt("Kopiera länken:", link); });
+    else window.prompt("Kopiera länken:", link);
+  });
+
   var DEFAULT_TASKS = [
     { id: 1, text: "Uppdatera CV", done: true },
     { id: 2, text: "Skicka två ansökningar", done: false },
@@ -87,24 +148,60 @@
   var tasks = load("mindag.tasks", DEFAULT_TASKS);
   if (!Array.isArray(tasks)) tasks = DEFAULT_TASKS.slice();
 
-  function eventRow(e, nowMin, isToday) {
-    var hh = String(Math.floor(e.min / 60)).padStart(2, "0") + ":" + String(e.min % 60).padStart(2, "0");
-    var past = isToday && e.min + 60 < nowMin;
-    return '<li class="' + (past ? "past" : "") + '"><time>' + hh + '</time><span class="bar' + (e.key ? "" : " muted") + '"></span><div>' + esc(e.title) + (e.place ? "<small>" + esc(e.place) + "</small>" : "") + "</div></li>";
+  function dayYmd(t, add) { var d = new Date(Date.UTC(t.y, t.m - 1, t.d + add)); return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() }; }
+  function ymdStr(o) { return o.y + "-" + String(o.m).padStart(2, "0") + "-" + String(o.d).padStart(2, "0"); }
+  function eventsOn(events, t, add) {
+    var o = dayYmd(t, add), n = dayYmd(t, add + 1), ds = ymdStr(o);
+    var from = Sun.stockholmDate(o.y, o.m, o.d, 0).getTime(), to = Sun.stockholmDate(n.y, n.m, n.d, 0).getTime();
+    return events.filter(function (e) {
+      if (e.allDay) return e.start <= ds && ds < e.end;
+      var s = Date.parse(e.start), en = Date.parse(e.end);
+      return s < to && en > from;
+    }).sort(function (a, b) { return (a.allDay ? 0 : 1) - (b.allDay ? 0 : 1) || Date.parse(a.start) - Date.parse(b.start); });
+  }
+  function eventRow(e, now, nextStart) {
+    var timed = !e.allDay, past = timed && Date.parse(e.end) < now;
+    var isNext = timed && e.start === nextStart;
+    return '<li class="' + (past ? "past" : "") + '"><time>' + (timed ? fmt(new Date(e.start)) : "Heldag") + '</time><span class="bar' + (isNext ? "" : " muted") + '"></span><div>' + esc(e.title) + (e.location ? "<small>" + esc(e.location) + "</small>" : "") + "</div></li>";
   }
   function renderEvents(t) {
-    var todays = EVENTS.filter(function (e) { return e.day === 0; });
-    $("events-today").innerHTML = todays.map(function (e) { return eventRow(e, t.min, true); }).join("");
-    $("evcount").textContent = todays.length + " händelser";
+    var now = Date.now(), events = connected() ? gdata.events : exampleEvents(t);
+    var upcoming = events.filter(function (e) { return !e.allDay && Date.parse(e.end) > now; }).sort(function (a, b) { return Date.parse(a.start) - Date.parse(b.start); });
+    var nextStart = upcoming.length ? upcoming[0].start : null;
+    var todays = eventsOn(events, t, 0);
+    $("events-today").innerHTML = todays.length ? todays.map(function (e) { return eventRow(e, now, nextStart); }).join("") : '<li class="empty">Inget inbokat idag</li>';
+    $("evcount").textContent = todays.length === 1 ? "1 händelse" : todays.length + " händelser";
     var html = "";
     for (var d = 0; d < 3; d++) {
-      var noon = new Date(Sun.stockholmDate(t.y, t.m, t.d, 12 * 60).getTime() + d * 86400000);
+      var o = dayYmd(t, d), noon = Sun.stockholmDate(o.y, o.m, o.d, 12 * 60);
       var label = d === 0 ? "Idag" : d === 1 ? "Imorgon" : cap(weekday.format(noon));
-      var list = EVENTS.filter(function (e) { return e.day === d; });
+      var list = eventsOn(events, t, d);
       html += '<section class="glass card"><div class="head"><h2>' + label + "</h2><span>" + esc(longDate.format(noon).replace(/^\S+\s/, "")) + '</span></div><ul class="events tnum">' +
-        (list.length ? list.map(function (e) { return eventRow(e, t.min, d === 0); }).join("") : '<li class="empty">Inget inbokat</li>') + "</ul></section>";
+        (list.length ? list.map(function (e) { return eventRow(e, now, nextStart); }).join("") : '<li class="empty">Inget inbokat</li>') + "</ul></section>";
     }
     $("calendar").innerHTML = html;
+  }
+  var shortDay = new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, weekday: "short" });
+  var shortDate = new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, day: "numeric", month: "short" });
+  function mailTime(iso) {
+    var d = new Date(iso), t = today(), ds = Sun.localParts(d), dd = { y: ds.year, m: ds.month, d: ds.day };
+    if (ymdStr(dd) === ymdStr(t)) return hm.format(d);
+    if (ymdStr(dd) === ymdStr(dayYmd(t, -1))) return "Igår";
+    if (Date.now() - d.getTime() < 6 * 86400000) return cap(shortDay.format(d).replace(".", ""));
+    return shortDate.format(d).replace(".", "");
+  }
+  function renderMail() {
+    var m = connected() ? gdata.mail : exampleMail(), live = connected();
+    $("mail").innerHTML = m.threads.length ? m.threads.map(function (x) {
+      var inner = "<b>" + esc(x.from) + "</b><time>" + esc(mailTime(x.date)) + "</time><p><span class=\"subj\">" + esc(x.subject) + "</span>" + (x.snippet ? " – " + esc(x.snippet) : "") + "</p>";
+      return '<li class="' + (x.unread ? "unread" : "") + '">' + (live && x.id ? '<a href="https://mail.google.com/mail/u/0/#inbox/' + encodeURIComponent(x.id) + '" target="_blank" rel="noopener">' + inner + "</a>" : inner) + "</li>";
+    }).join("") : '<li class="empty">Inkorgen är tom</li>';
+    $("mailcount").textContent = m.unread === 1 ? "1 oläst" : m.unread + " olästa";
+  }
+  function renderData() {
+    var live = connected();
+    document.querySelectorAll("[data-src]").forEach(function (el) { el.hidden = el.dataset.src !== (live ? "google" : "example"); });
+    renderEvents(today()); renderMail();
   }
   var CHECK = '<span class="box"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>';
   function taskList(list, prefix) {
@@ -139,9 +236,6 @@
   $("clear-done").addEventListener("click", function () {
     tasks = tasks.filter(function (t) { return !t.done; }); save("mindag.tasks", tasks); renderTasks();
   });
-  $("mail").innerHTML = MAIL.map(function (m) {
-    return '<li class="' + (m.unread ? "unread" : "") + '"><b>' + esc(m.from) + "</b><time>" + esc(m.time) + "</time><p>" + esc(m.text) + "</p></li>";
-  }).join("");
 
   /* ---------- Idag ---------- */
   function greeting(min) { var h = min / 60; return h < 5 ? "God natt" : h < 10 ? "God morgon" : h < 12 ? "God förmiddag" : h < 17 ? "God eftermiddag" : h < 23 ? "God kväll" : "God natt"; }
@@ -165,11 +259,14 @@
     $("updated").textContent = "Uppdaterad " + hm.format(now);
 
     var key = t.y + "-" + t.m + "-" + t.d + "-" + Math.floor(t.min / 15);
-    if (key !== lastDay) { lastDay = key; renderEvents(t); }
+    if (key !== lastDay) { lastDay = key; renderData(); }
+    // Hämta nytt från Google var femte minut medan appen är öppen.
+    if (G && (!gdata || Date.now() - gdata.at > 5 * 60000)) fetchGoogle().catch(function () {});
   }
 
   /* ---------- start ---------- */
   showThemeOpt();
+  showGoogle();
   renderTasks();
   go(location.hash.slice(1));
   update();
