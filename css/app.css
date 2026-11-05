@@ -1,0 +1,130 @@
+/* Min dag – frostat glas ovanpå en levande jord.
+   Färgerna (tokens) blandas i js/app.js efter solens höjd i Stockholm, eller låses av temainställningen. */
+:root{
+  --bg:#dfe8e3; --glass:rgba(248,251,249,.72); --edge:rgba(255,255,255,.7);
+  --ink:#0f1c17; --ink-2:rgba(15,28,23,.66); --line:rgba(15,28,23,.11);
+  --accent:#2e7a55; --accent-soft:rgba(46,122,85,.14); --on-accent:#ffffff; --shadow:rgba(20,40,30,.20);
+  --font:"Schibsted Grotesk","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+  --r-card:22px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#05080b;color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input{font:inherit;color:inherit}
+a{color:var(--accent)}
+.tnum{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+[hidden]{display:none!important}
+
+#sky{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+#sky-fallback{position:fixed;inset:0;z-index:0;background:radial-gradient(120% 80% at 50% 100%,#123a52,#050a12 70%)}
+
+.glass{background:var(--glass);border:1px solid var(--edge);border-radius:var(--r-card);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  box-shadow:0 10px 30px -14px var(--shadow);transition:background-color .6s,border-color .6s,color .6s}
+
+/* ---------- skal ---------- */
+.shell{position:relative;z-index:1;min-height:100%;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+.col{max-width:440px;width:100%;margin:0 auto}
+.view{display:flex;flex-direction:column;gap:12px}
+.view[data-view="idag"]{padding-top:30vh}
+.view:not([data-view="idag"]){padding-top:calc(12vh + env(safe-area-inset-top,0px))}
+
+.card{padding:16px 18px}
+.eyebrow{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.hero h1,.page-title h1{font-size:30px;line-height:1.1;font-weight:650;letter-spacing:-.02em;margin:6px 0 4px;text-wrap:balance}
+.page-title h1{margin-bottom:0}
+.hero .greet{font-size:17px;color:var(--ink-2);margin:0}
+.sunline{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:14px;color:var(--ink-2)}
+.sunline b{color:var(--ink);font-weight:600}
+.sunline svg{width:15px;height:15px;vertical-align:-2px;margin-right:5px;stroke:var(--accent)}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);min-height:20px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:11.5px;letter-spacing:.02em}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+.head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.head h2{font-size:15px;font-weight:650;margin:0;letter-spacing:-.005em}
+.head span{font-size:12.5px;color:var(--ink-2)}
+
+.events{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.events li{display:grid;grid-template-columns:52px 3px 1fr;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.events li:first-child{border-top:0;padding-top:2px}
+.events time{font-weight:600}
+.events .bar{height:30px;border-radius:2px;background:var(--accent)}
+.events .bar.muted{background:var(--line)}
+.events small{display:block;color:var(--ink-2);font-size:12.5px}
+.events li.past{opacity:.55}
+.events .empty{display:block;color:var(--ink-2);border:0;padding:4px 0}
+
+.tasks{list-style:none;margin:0;padding:0}
+.tasks li{border-top:1px solid var(--line)}
+.tasks li:first-child{border-top:0}
+.tasks label{display:flex;gap:12px;align-items:center;padding:10px 0;cursor:pointer;min-height:44px;position:relative}
+.tasks input{position:absolute;opacity:0;pointer-events:none}
+.box{flex:none;width:22px;height:22px;border-radius:7px;border:1.6px solid var(--ink-2);display:grid;place-items:center;transition:background .25s,border-color .25s,transform .25s}
+.box svg{width:13px;height:13px;stroke:var(--on-accent);opacity:0;transform:scale(.4);transition:all .25s cubic-bezier(.3,1.6,.5,1)}
+.tasks input:checked + .box{background:var(--accent);border-color:var(--accent);transform:scale(1.04)}
+.tasks input:checked + .box svg{opacity:1;transform:scale(1)}
+.tasks input:focus-visible + .box{outline:2px solid var(--accent);outline-offset:3px}
+.tasks .t{transition:color .3s;overflow-wrap:anywhere}
+.tasks input:checked ~ .t{color:var(--ink-2);text-decoration:line-through;text-decoration-color:var(--ink-2)}
+.tasks .empty{color:var(--ink-2);padding:6px 0;border:0}
+
+.add{display:flex;gap:8px;margin-top:12px}
+.add input{flex:1;min-width:0;border:1px solid var(--line);background:transparent;border-radius:999px;padding:9px 14px;min-height:44px}
+.add input::placeholder{color:var(--ink-2)}
+.add input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.linkbtn{background:none;border:0;color:var(--ink-2);font-size:12.5px;padding:10px 0 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.big{font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1;margin-top:8px}
+.sub{color:var(--ink-2);font-size:13px;margin-top:6px}
+
+.mail{list-style:none;margin:0;padding:0}
+.mail li{padding:10px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:2px 12px}
+.mail li:first-child{border-top:0;padding-top:2px}
+.mail b{font-weight:600}
+.mail time{font-size:12.5px;color:var(--ink-2)}
+.mail p{grid-column:1/-1;margin:0;color:var(--ink-2);font-size:13.5px}
+.mail li.unread b::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:1px}
+
+.btn{border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 13px;font-size:13.5px;font-weight:550;cursor:pointer;min-height:40px}
+.btn:hover{border-color:var(--accent)}
+.btn[aria-checked=true],.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:999px;padding:3px;gap:3px;width:max-content;max-width:100%}
+.seg .btn{border:0}
+.hint{font-size:13px;color:var(--ink-2);margin:10px 0 0}
+
+/* ---------- navigation ---------- */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:5;
+  padding:8px max(16px,env(safe-area-inset-left,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px));
+  display:flex;justify-content:center}
+.nav .glass{display:grid;grid-template-columns:repeat(5,1fr);width:100%;max-width:440px;border-radius:24px;padding:6px}
+.nav button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0;border-radius:16px;font-size:11px;color:var(--ink-2);cursor:pointer;min-height:48px}
+.nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7}
+.nav button[aria-current]{color:var(--accent);background:var(--accent-soft);font-weight:600}
+.topnav{display:none;gap:4px;padding:5px;margin-bottom:12px}
+.topnav button{flex:1;border:0;background:none;padding:8px;border-radius:14px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.topnav button[aria-current]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+.credit{position:fixed;z-index:4;right:max(12px,env(safe-area-inset-right,0px));top:calc(6px + env(safe-area-inset-top,0px));
+  font-size:10.5px;color:rgba(255,255,255,.62);text-decoration:none;text-shadow:0 1px 2px rgba(0,0,0,.6);letter-spacing:.02em}
+.credit:hover{color:#fff}
+
+/* ---------- dator: Idag till vänster, jorden fyller resten ---------- */
+@media (min-width:980px){
+  .shell{padding-top:28px;padding-bottom:28px;height:100%}
+  .col{margin:0;max-width:420px;max-height:100%;overflow:auto;scrollbar-width:none}
+  .col::-webkit-scrollbar{display:none}
+  .view[data-view="idag"],.view:not([data-view="idag"]){padding-top:0}
+  .nav{display:none}
+  .topnav{display:flex}
+  .credit{top:auto;bottom:14px;right:18px}
+  body{overflow:hidden}
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

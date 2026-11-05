@@ -1,0 +1,68 @@
+# Publicerar appen på GitHub Pages varje gång något ändras i main.
+# Hämtar också NASA-bilderna och lägger dem bredvid appen.
+name: Publicera Min dag
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera bildverktyg
+        run: pip install pillow
+
+      - name: Kom ihåg NASA-bilderna mellan körningar
+        uses: actions/cache@v4
+        with:
+          path: nasa-src
+          key: nasa-src-v1
+
+      - name: Hämta NASA-bilder
+        env:
+          BLUE_MARBLE_URL: ${{ vars.BLUE_MARBLE_URL }}
+          BLACK_MARBLE_URL: ${{ vars.BLACK_MARBLE_URL }}
+        run: python tools/fetch_nasa.py nasa-src
+
+      - name: Bygg webbplatsen
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r css js _site/
+          python tools/prepare_images.py nasa-src _site/img
+          cp nasa-src/sources.txt _site/img/sources.txt
+          touch _site/.nojekyll
+          ls -la _site _site/img
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
